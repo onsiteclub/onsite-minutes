@@ -42,8 +42,6 @@ workflows:
       - build/ios/ipa/*.ipa
 
     publishing:
-      app_store_connect:
-        auth: integration
       email:
         recipients:
           - cris@onsiteclub.com.br
