@@ -1,4 +1,3 @@
-import { File } from "expo-file-system";
 import type { MinutesData } from "./types";
 
 // URL do backend — Vercel em produção
@@ -7,11 +6,14 @@ const API_BASE = __DEV__
   : "https://onsite-minutes.vercel.app";
 
 export async function transcribeAudio(filePath: string): Promise<string> {
-  const file = new File(filePath);
   const formData = new FormData();
 
-  // File class implements Blob, so we can append directly
-  formData.append("audio", file as unknown as Blob, "audio.m4a");
+  // React Native FormData expects {uri, type, name} object for file uploads
+  formData.append("audio", {
+    uri: filePath,
+    type: "audio/m4a",
+    name: "audio.m4a",
+  } as any);
 
   const response = await fetch(`${API_BASE}/api/transcribe`, {
     method: "POST",
@@ -19,7 +21,8 @@ export async function transcribeAudio(filePath: string): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`Erro na transcrição: ${response.status}`);
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Erro na transcrição: ${response.status} ${errorText}`);
   }
 
   const data = await response.json();
