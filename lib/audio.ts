@@ -60,15 +60,13 @@ async function startNewChunk(): Promise<void> {
   session.currentChunkNumber++;
   const chunkNumber = session.currentChunkNumber;
 
-  const recording = new Audio.Recording();
-  await recording.prepareToRecordAsync(
+  const { recording } = await Audio.Recording.createAsync(
     Audio.RecordingOptionsPresets.HIGH_QUALITY
   );
-  await recording.startAsync();
 
   session.recording = recording;
 
-  const filePath = new File(Paths.document, `meeting_${session.meetingId}_chunk_${chunkNumber}.m4a`).uri;
+  const filePath = `${Paths.document.uri}meeting_${session.meetingId}_chunk_${chunkNumber}.m4a`;
 
   await createAudioChunk(session.meetingId, chunkNumber, filePath);
   await notifyChunkChange();
@@ -98,10 +96,14 @@ async function rotateChunk(): Promise<void> {
 
   // Salva o arquivo no local definitivo
   const chunkId = `${session.meetingId}_chunk_${finishedChunkNumber}`;
-  const destPath = new File(Paths.document, `meeting_${session.meetingId}_chunk_${finishedChunkNumber}.m4a`).uri;
+  const destPath = `${Paths.document.uri}meeting_${session.meetingId}_chunk_${finishedChunkNumber}.m4a`;
 
   if (uri && uri !== destPath) {
-    new File(uri).move(new File(destPath));
+    try {
+      new File(uri).move(new File(destPath));
+    } catch (e) {
+      console.warn("Move failed, using original URI:", uri);
+    }
   }
 
   // Inicia transcrição em background (não bloqueia)
@@ -147,10 +149,14 @@ export async function stopSession(): Promise<string> {
   const uri = session.recording.getURI();
 
   const chunkId = `${meetingId}_chunk_${lastChunkNumber}`;
-  const destPath = new File(Paths.document, `meeting_${meetingId}_chunk_${lastChunkNumber}.m4a`).uri;
+  const destPath = `${Paths.document.uri}meeting_${meetingId}_chunk_${lastChunkNumber}.m4a`;
 
   if (uri && uri !== destPath) {
-    new File(uri).move(new File(destPath));
+    try {
+      new File(uri).move(new File(destPath));
+    } catch (e) {
+      console.warn("Move failed, using original URI:", uri);
+    }
   }
 
   // Transcreve o último chunk (aguarda)

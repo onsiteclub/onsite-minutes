@@ -70,9 +70,9 @@ export default function MeetingRecordScreen() {
       timerRef.current = setInterval(() => {
         setElapsed(getElapsedTime());
       }, 1000);
-    } catch (error) {
-      Alert.alert("Erro", "Não foi possível iniciar a gravação.");
-      console.error(error);
+    } catch (error: any) {
+      Alert.alert("Erro", `Não foi possível iniciar a gravação:\n${error?.message || error}`);
+      console.error("Recording error:", error);
     }
   }
 
