@@ -41,6 +41,16 @@ workflows:
         script: |
           cd ios && pod install
 
+      - name: Strip Werror from Pods xcconfig files
+        script: |
+          cd ios
+          # Remove -Werror from all Pods xcconfig files
+          find Pods/Target\ Support\ Files -name "*.xcconfig" -exec sed -i '' 's/-Werror //g; s/-Werror$//g' {} +
+          # Add -Wno-error to suppress any remaining warnings-as-errors
+          find Pods/Target\ Support\ Files -name "*.xcconfig" -exec sed -i '' '/OTHER_CFLAGS/s/$/ -Wno-error/' {} +
+          find Pods/Target\ Support\ Files -name "*.xcconfig" -exec sed -i '' '/OTHER_CPLUSPLUSFLAGS/s/$/ -Wno-error/' {} +
+          echo "Stripped -Werror from all Pods xcconfig files"
+
       - name: Set up code signing
         script: |
           xcode-project use-profiles
@@ -58,8 +68,7 @@ workflows:
           xcode-project build-ipa \
             --workspace "$WORKSPACE" \
             --scheme "$SCHEME" \
-            --config Release \
-            --archive-xcargs "GCC_TREAT_WARNINGS_AS_ERRORS=NO SWIFT_TREAT_WARNINGS_AS_ERRORS=NO"
+            --config Release
 
     artifacts:
       - build/ios/ipa/*.ipa
