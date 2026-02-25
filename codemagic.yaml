@@ -24,6 +24,14 @@ workflows:
         script: |
           npx expo prebuild --platform ios --clean
 
+      - name: Find Xcode workspace
+        script: |
+          WORKSPACE=$(find ios -name "*.xcworkspace" -maxdepth 1 | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "WORKSPACE=$WORKSPACE" >> $CM_ENV
+          echo "SCHEME=$SCHEME" >> $CM_ENV
+          echo "Found workspace: $WORKSPACE, scheme: $SCHEME"
+
       - name: Install CocoaPods
         script: |
           cd ios && pod install
@@ -35,8 +43,8 @@ workflows:
       - name: Build iOS
         script: |
           xcode-project build-ipa \
-            --workspace "ios/onsiteminutes.xcworkspace" \
-            --scheme "onsiteminutes"
+            --workspace "$WORKSPACE" \
+            --scheme "$SCHEME"
 
     artifacts:
       - build/ios/ipa/*.ipa
