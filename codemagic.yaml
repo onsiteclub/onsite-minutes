@@ -14,7 +14,7 @@ workflows:
       vars:
         BUNDLE_ID: "com.onsiteclub.minutes"
       ios_signing:
-        distribution_type: ad_hoc
+        distribution_type: development
         bundle_identifier: com.onsiteclub.minutes
     scripts:
       - name: Install dependencies
