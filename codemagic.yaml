@@ -21,9 +21,19 @@ workflows:
         script: |
           npm ci || npm install --legacy-peer-deps
 
-      - name: Install Expo CLI
+      - name: Set build number in app.json
         script: |
-          npm install -g expo-cli eas-cli
+          # Use epoch timestamp to guarantee unique, always-increasing build number
+          NEW_BUILD=$(date +%s)
+          echo "Setting build number to: $NEW_BUILD"
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json'));
+            app.expo.ios = app.expo.ios || {};
+            app.expo.ios.buildNumber = String($NEW_BUILD);
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+            console.log('buildNumber set to:', app.expo.ios.buildNumber);
+          "
 
       - name: Prebuild iOS
         script: |
@@ -44,14 +54,6 @@ workflows:
       - name: Set up code signing
         script: |
           xcode-project use-profiles
-
-      - name: Increment build number
-        script: |
-          cd ios
-          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "com.onsiteclub.minutes" || echo 0)
-          NEW_BUILD=$((LATEST_BUILD + 1))
-          echo "Latest TestFlight build: $LATEST_BUILD → New build: $NEW_BUILD"
-          agvtool new-version -all $NEW_BUILD
 
       - name: Build iOS
         script: |
