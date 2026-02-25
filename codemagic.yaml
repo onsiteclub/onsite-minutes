@@ -62,6 +62,14 @@ workflows:
         script: |
           xcode-project use-profiles
 
+      - name: Increment build number
+        script: |
+          cd ios
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "com.onsiteclub.minutes" || echo 0)
+          NEW_BUILD=$((LATEST_BUILD + 1))
+          echo "Latest TestFlight build: $LATEST_BUILD → New build: $NEW_BUILD"
+          agvtool new-version -all $NEW_BUILD
+
       - name: Build iOS
         script: |
           xcode-project build-ipa \

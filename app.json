@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.onsiteclub.minutes",
+      "buildNumber": "1",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Precisamos acessar o microfone para gravar reuniões.",
         "UIBackgroundModes": ["audio"]
