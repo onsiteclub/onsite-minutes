@@ -44,6 +44,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="debug"
+        options={{
+          title: "Debug",
+          tabBarIcon: ({ color }) => (
+            <Text style={{ fontSize: 22, color }}>🔧</Text>
+          ),
+        }}
+      />
     </Tabs>
   );
 }

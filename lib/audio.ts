@@ -6,6 +6,7 @@ import {
   getChunksForMeeting,
 } from "./database";
 import { transcribeAudio } from "./api";
+import { logger } from "./logger";
 import type { AudioChunk } from "./types";
 
 const CHUNK_DURATION_MS = 15 * 60 * 1000; // 15 minutos
@@ -23,12 +24,15 @@ export interface RecordingSession {
 let session: RecordingSession | null = null;
 
 export async function requestPermissions(): Promise<boolean> {
+  logger.info("Requesting audio permissions...");
   const { granted } = await Audio.requestPermissionsAsync();
+  logger.info(`Permissions granted: ${granted}`);
   if (granted) {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
     });
+    logger.info("Audio mode set for recording");
   }
   return granted;
 }
@@ -37,6 +41,7 @@ export async function startSession(
   meetingId: string,
   onChunkStatusChange?: (chunks: AudioChunk[]) => void
 ): Promise<void> {
+  logger.info(`Starting session for meeting: ${meetingId}`);
   if (session) {
     throw new Error("Já existe uma sessão de gravação ativa");
   }
@@ -59,17 +64,26 @@ async function startNewChunk(): Promise<void> {
 
   session.currentChunkNumber++;
   const chunkNumber = session.currentChunkNumber;
+  logger.info(`Starting chunk ${chunkNumber} for meeting ${session.meetingId}`);
 
-  const { recording } = await Audio.Recording.createAsync(
-    Audio.RecordingOptionsPresets.HIGH_QUALITY
-  );
+  try {
+    const { recording } = await Audio.Recording.createAsync(
+      Audio.RecordingOptionsPresets.HIGH_QUALITY
+    );
+    logger.info(`Recording created successfully for chunk ${chunkNumber}`);
 
-  session.recording = recording;
+    session.recording = recording;
 
-  const filePath = `${Paths.document.uri}meeting_${session.meetingId}_chunk_${chunkNumber}.m4a`;
+    const filePath = `${Paths.document.uri}meeting_${session.meetingId}_chunk_${chunkNumber}.m4a`;
+    logger.info(`Chunk file path: ${filePath}`);
 
-  await createAudioChunk(session.meetingId, chunkNumber, filePath);
-  await notifyChunkChange();
+    await createAudioChunk(session.meetingId, chunkNumber, filePath);
+    logger.info(`Chunk ${chunkNumber} saved to database`);
+    await notifyChunkChange();
+  } catch (error) {
+    logger.error(`Failed to start chunk ${chunkNumber}:`, error);
+    throw error;
+  }
 
   // Timer para auto-split em 15 minutos
   session.timer = setTimeout(async () => {
@@ -84,32 +98,30 @@ async function rotateChunk(): Promise<void> {
 
   const finishedRecording = session.recording;
   const finishedChunkNumber = session.currentChunkNumber;
+  logger.info(`Rotating chunk ${finishedChunkNumber}`);
 
   if (session.timer) {
     clearTimeout(session.timer);
     session.timer = null;
   }
 
-  // Para a gravação atual
   await finishedRecording.stopAndUnloadAsync();
   const uri = finishedRecording.getURI();
+  logger.info(`Chunk ${finishedChunkNumber} stopped, URI: ${uri}`);
 
-  // Salva o arquivo no local definitivo
   const chunkId = `${session.meetingId}_chunk_${finishedChunkNumber}`;
   const destPath = `${Paths.document.uri}meeting_${session.meetingId}_chunk_${finishedChunkNumber}.m4a`;
 
   if (uri && uri !== destPath) {
     try {
       new File(uri).move(new File(destPath));
+      logger.info(`Moved chunk to: ${destPath}`);
     } catch (e) {
-      console.warn("Move failed, using original URI:", uri);
+      logger.warn(`Move failed, using original URI: ${uri}`);
     }
   }
 
-  // Inicia transcrição em background (não bloqueia)
   transcribeChunkInBackground(chunkId, destPath);
-
-  // Inicia imediatamente o próximo chunk
   await startNewChunk();
 }
 
@@ -118,16 +130,17 @@ async function transcribeChunkInBackground(
   filePath: string
 ): Promise<void> {
   try {
+    logger.info(`Transcribing chunk ${chunkId}...`);
     await updateChunkStatus(chunkId, "uploading");
     await notifyChunkChange();
 
     const text = await transcribeAudio(filePath);
+    logger.info(`Chunk ${chunkId} transcribed: ${text.substring(0, 100)}...`);
 
     await updateChunkStatus(chunkId, "transcribed", text);
     await notifyChunkChange();
   } catch (error) {
-    console.error(`Erro ao transcrever chunk ${chunkId}:`, error);
-    // Mantém como "uploading" para retry posterior
+    logger.error(`Transcription failed for ${chunkId}:`, error);
   }
 }
 
@@ -138,15 +151,16 @@ export async function stopSession(): Promise<string> {
 
   const meetingId = session.meetingId;
   const lastChunkNumber = session.currentChunkNumber;
+  logger.info(`Stopping session for meeting ${meetingId}, last chunk: ${lastChunkNumber}`);
 
   if (session.timer) {
     clearTimeout(session.timer);
     session.timer = null;
   }
 
-  // Para a última gravação
   await session.recording.stopAndUnloadAsync();
   const uri = session.recording.getURI();
+  logger.info(`Last recording stopped, URI: ${uri}`);
 
   const chunkId = `${meetingId}_chunk_${lastChunkNumber}`;
   const destPath = `${Paths.document.uri}meeting_${meetingId}_chunk_${lastChunkNumber}.m4a`;
@@ -155,11 +169,10 @@ export async function stopSession(): Promise<string> {
     try {
       new File(uri).move(new File(destPath));
     } catch (e) {
-      console.warn("Move failed, using original URI:", uri);
+      logger.warn(`Move failed, using original URI: ${uri}`);
     }
   }
 
-  // Transcreve o último chunk (aguarda)
   await updateChunkStatus(chunkId, "uploading");
   await notifyChunkChange();
 
@@ -167,31 +180,31 @@ export async function stopSession(): Promise<string> {
     const text = await transcribeAudio(destPath);
     await updateChunkStatus(chunkId, "transcribed", text);
     await notifyChunkChange();
+    logger.info("Last chunk transcribed");
   } catch (error) {
-    console.error("Erro ao transcrever último chunk:", error);
+    logger.error("Failed to transcribe last chunk:", error);
   }
 
   session = null;
 
-  // Aguarda todas as transcrições pendentes
   await waitForAllTranscriptions(meetingId);
 
-  // Concatena todos os textos
   const chunks = await getChunksForMeeting(meetingId);
   const fullText = chunks
     .filter((c) => c.transcription)
     .map((c) => c.transcription)
     .join("\n\n");
 
+  logger.info(`Session complete. Total text length: ${fullText.length}`);
   return fullText;
 }
 
 async function waitForAllTranscriptions(meetingId: string): Promise<void> {
-  // Poll a cada 2 segundos até todas estarem transcritas
   for (let i = 0; i < 60; i++) {
     const chunks = await getChunksForMeeting(meetingId);
     const allDone = chunks.every((c) => c.status === "transcribed");
     if (allDone) return;
+    logger.info(`Waiting for transcriptions... (${i + 1}/60)`);
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 }
