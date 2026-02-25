@@ -13,9 +13,6 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: "com.onsiteclub.minutes"
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: com.onsiteclub.minutes
     scripts:
       - name: Install dependencies
         script: |
