@@ -41,13 +41,6 @@ workflows:
         script: |
           cd ios && pod install
 
-      - name: Suppress Pods warnings-as-errors
-        script: |
-          cd ios
-          sed -i '' 's/GCC_TREAT_WARNINGS_AS_ERRORS = YES/GCC_TREAT_WARNINGS_AS_ERRORS = NO/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/SWIFT_TREAT_WARNINGS_AS_ERRORS = YES/SWIFT_TREAT_WARNINGS_AS_ERRORS = NO/g' Pods/Pods.xcodeproj/project.pbxproj
-          echo "Patched Pods project to suppress warnings-as-errors"
-
       - name: Set up code signing
         script: |
           xcode-project use-profiles
@@ -65,7 +58,8 @@ workflows:
           xcode-project build-ipa \
             --workspace "$WORKSPACE" \
             --scheme "$SCHEME" \
-            --config Release
+            --config Release \
+            --archive-xcargs "GCC_TREAT_WARNINGS_AS_ERRORS=NO SWIFT_TREAT_WARNINGS_AS_ERRORS=NO"
 
     artifacts:
       - build/ios/ipa/*.ipa
