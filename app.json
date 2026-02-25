@@ -37,7 +37,8 @@
         {
           "sounds": []
         }
-      ]
+      ],
+      "./plugins/withSuppressWarnings"
     ]
   }
 }
