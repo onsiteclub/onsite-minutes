@@ -40,23 +40,19 @@ workflows:
       - name: Patch Podfile to suppress warnings
         script: |
           cd ios
-          # Add inhibit_all_warnings to suppress third-party deprecation errors
+          # Add inhibit_all_warnings before use_native_modules
           sed -i '' '/^platform/a\
           inhibit_all_warnings!
           ' Podfile
-          # Add post_install to disable warnings-as-errors in all Pods targets
-          cat >> Podfile << 'PATCH'
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-                config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-                config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+          # Inject warning suppression into existing post_install hook
+          sed -i '' '/post_install do |installer|/a\
+              installer.pods_project.targets.each do |target|\
+                target.build_configurations.each do |config|\
+                  config.build_settings["GCC_TREAT_WARNINGS_AS_ERRORS"] = "NO"\
+                  config.build_settings["SWIFT_TREAT_WARNINGS_AS_ERRORS"] = "NO"\
+                end\
               end
-            end
-          end
-          PATCH
+          ' Podfile
 
       - name: Install CocoaPods
         script: |
