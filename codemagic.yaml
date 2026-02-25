@@ -9,7 +9,7 @@ workflows:
       app_store_connect: OnSite Calculator
     environment:
       node: 20
-      xcode: latest
+      xcode: 16.2
       cocoapods: default
       ios_signing:
         distribution_type: app_store
@@ -36,6 +36,27 @@ workflows:
           echo "WORKSPACE=$WORKSPACE" >> $CM_ENV
           echo "SCHEME=$SCHEME" >> $CM_ENV
           echo "Found workspace: $WORKSPACE, scheme: $SCHEME"
+
+      - name: Patch Podfile to suppress warnings
+        script: |
+          cd ios
+          # Add inhibit_all_warnings to suppress third-party deprecation errors
+          sed -i '' '/^platform/a\
+          inhibit_all_warnings!
+          ' Podfile
+          # Add post_install to disable warnings-as-errors in all Pods targets
+          cat >> Podfile << 'PATCH'
+
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+                config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+                config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+              end
+            end
+          end
+          PATCH
 
       - name: Install CocoaPods
         script: |
