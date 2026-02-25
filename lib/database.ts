@@ -168,6 +168,13 @@ export async function updateMeetingMinutes(
   );
 }
 
+export async function deleteMeeting(id: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync("DELETE FROM audio_chunks WHERE meeting_id = ?", [id]);
+  await database.runAsync("DELETE FROM meeting_participants WHERE meeting_id = ?", [id]);
+  await database.runAsync("DELETE FROM meetings WHERE id = ?", [id]);
+}
+
 // --- Meeting Participants ---
 
 export async function getMeetingParticipants(

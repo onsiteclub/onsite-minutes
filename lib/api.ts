@@ -1,10 +1,10 @@
 import { File } from "expo-file-system";
 import type { MinutesData } from "./types";
 
-// URL do backend — mudar para URL da Vercel em produção
+// URL do backend — Vercel em produção
 const API_BASE = __DEV__
   ? "http://192.168.1.100:3001" // IP local para dev (ajustar)
-  : "https://onsite-minutes-api.vercel.app";
+  : "https://onsite-minutes.vercel.app";
 
 export async function transcribeAudio(filePath: string): Promise<string> {
   const file = new File(filePath);

@@ -1,8 +1,8 @@
 import { useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { colors, spacing, fontSize } from "../../lib/theme";
-import { getAllMeetings } from "../../lib/database";
+import { getAllMeetings, deleteMeeting } from "../../lib/database";
 import type { Meeting } from "../../lib/types";
 
 export default function HistoryScreen() {
@@ -17,6 +17,24 @@ export default function HistoryScreen() {
 
   async function loadMeetings() {
     setMeetings(await getAllMeetings());
+  }
+
+  function confirmDelete(meeting: Meeting) {
+    Alert.alert(
+      "Excluir reunião",
+      `Deseja excluir "${meeting.title || "Reunião"}" de ${meeting.date}?\n\nIsso apagará a gravação, transcrição e ata.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            await deleteMeeting(meeting.id);
+            await loadMeetings();
+          },
+        },
+      ]
+    );
   }
 
   function getStatusLabel(status: Meeting["status"]) {
@@ -57,6 +75,7 @@ export default function HistoryScreen() {
                   router.push(`/meeting/${item.id}`);
                 }
               }}
+              onLongPress={() => confirmDelete(item)}
             >
               <View style={styles.cardInfo}>
                 <Text style={styles.cardTitle}>
@@ -64,15 +83,24 @@ export default function HistoryScreen() {
                 </Text>
                 <Text style={styles.cardDate}>{item.date}</Text>
               </View>
-              <View
-                style={[
-                  styles.badge,
-                  { backgroundColor: status.color + "20" },
-                ]}
-              >
-                <Text style={[styles.badgeText, { color: status.color }]}>
-                  {status.text}
-                </Text>
+              <View style={styles.cardActions}>
+                <View
+                  style={[
+                    styles.badge,
+                    { backgroundColor: status.color + "20" },
+                  ]}
+                >
+                  <Text style={[styles.badgeText, { color: status.color }]}>
+                    {status.text}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => confirmDelete(item)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.deleteIcon}>🗑</Text>
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           );
@@ -114,6 +142,11 @@ const styles = StyleSheet.create({
     color: colors.gray,
     marginTop: 2,
   },
+  cardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   badge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
@@ -122,6 +155,12 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: fontSize.xs,
     fontWeight: "600",
+  },
+  deleteBtn: {
+    padding: 4,
+  },
+  deleteIcon: {
+    fontSize: 18,
   },
   empty: {
     alignItems: "center",
