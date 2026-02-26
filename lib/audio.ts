@@ -31,6 +31,7 @@ export async function requestPermissions(): Promise<boolean> {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
     });
     logger.info("Audio mode set for recording");
   }

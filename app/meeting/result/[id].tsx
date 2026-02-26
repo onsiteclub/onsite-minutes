@@ -9,11 +9,9 @@ import {
   Share,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import * as FileSystem from "expo-file-system";
+import * as MailComposer from "expo-mail-composer";
 import { colors, spacing, fontSize } from "../../../lib/theme";
-import { getMeeting, getMeetingParticipants, markParticipantSent } from "../../../lib/database";
-import { sendEmail } from "../../../lib/api";
-import { getPdfBase64 } from "../../../lib/pdf";
+import { getMeeting, getMeetingParticipants } from "../../../lib/database";
 import type { MinutesData, Contact } from "../../../lib/types";
 
 export default function MeetingResultScreen() {
@@ -23,7 +21,6 @@ export default function MeetingResultScreen() {
   const [participants, setParticipants] = useState<
     (Contact & { sent_at: number | null })[]
   >([]);
-  const [sendingId, setSendingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -40,61 +37,44 @@ export default function MeetingResultScreen() {
     setParticipants(parts);
   }
 
-  async function handleSendEmail(contact: Contact & { sent_at: number | null }) {
+  async function handleEmailParticipant(contact: Contact) {
     if (!minutes || !pdfPath) return;
 
-    setSendingId(contact.id);
-    try {
-      const pdfBase64 = await getPdfBase64(pdfPath);
-
-      const html = `
-        <p>Olá ${contact.name},</p>
-        <p>Segue em anexo a ata da reunião <strong>${minutes.title}</strong>.</p>
-        <p>Atenciosamente,<br/>OnSite Minutes</p>
-      `;
-
-      await sendEmail(
-        contact.email,
-        contact.name,
-        minutes.title,
-        html,
-        pdfBase64
-      );
-
-      await markParticipantSent(id!, contact.id);
-      await loadData();
-
-      Alert.alert("Enviado", `Email enviado para ${contact.name}.`);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Erro", `Não foi possível enviar para ${contact.name}.`);
-    } finally {
-      setSendingId(null);
-    }
-  }
-
-  async function handleSendAll() {
-    const pending = participants.filter((p) => !p.sent_at && p.email);
-    if (pending.length === 0) {
-      Alert.alert("Todos enviados", "Todos os participantes já receberam.");
+    const available = await MailComposer.isAvailableAsync();
+    if (!available) {
+      Alert.alert("Erro", "Nenhum app de email configurado neste dispositivo.");
       return;
     }
 
-    Alert.alert(
-      "Enviar para todos",
-      `Enviar ata para ${pending.length} participante(s)?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Enviar",
-          onPress: async () => {
-            for (const p of pending) {
-              await handleSendEmail(p);
-            }
-          },
-        },
-      ]
-    );
+    await MailComposer.composeAsync({
+      recipients: [contact.email],
+      subject: `Ata de Reunião: ${minutes.title}`,
+      body: `Olá ${contact.name},\n\nSegue em anexo a ata da reunião "${minutes.title}".\n\nAtenciosamente,\nOnSite Minutes`,
+      attachments: [pdfPath],
+    });
+  }
+
+  async function handleEmailAll() {
+    if (!minutes || !pdfPath) return;
+
+    const emails = participants.filter((p) => p.email).map((p) => p.email);
+    if (emails.length === 0) {
+      Alert.alert("Sem destinatários", "Nenhum participante tem email cadastrado.");
+      return;
+    }
+
+    const available = await MailComposer.isAvailableAsync();
+    if (!available) {
+      Alert.alert("Erro", "Nenhum app de email configurado neste dispositivo.");
+      return;
+    }
+
+    await MailComposer.composeAsync({
+      recipients: emails,
+      subject: `Ata de Reunião: ${minutes.title}`,
+      body: `Olá,\n\nSegue em anexo a ata da reunião "${minutes.title}".\n\nAtenciosamente,\nOnSite Minutes`,
+      attachments: [pdfPath],
+    });
   }
 
   async function handleSharePdf() {
@@ -162,50 +142,40 @@ export default function MeetingResultScreen() {
 
       {/* Ações */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.shareBtn} onPress={handleSharePdf}>
-          <Text style={styles.shareBtnText}>📄 Compartilhar PDF</Text>
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleSharePdf}>
+          <Text style={styles.primaryBtnText}>Compartilhar PDF</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleEmailAll}>
+          <Text style={styles.primaryBtnText}>Enviar por Email</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Envio por email */}
-      <View style={styles.sendSection}>
-        <Text style={styles.sendTitle}>Enviar aos Participantes</Text>
+      {/* Participantes */}
+      {participants.length > 0 && (
+        <View style={styles.sendSection}>
+          <Text style={styles.sendTitle}>Participantes</Text>
 
-        {participants.map((p) => (
-          <View key={p.id} style={styles.participantRow}>
-            <View style={styles.participantInfo}>
-              <Text style={styles.participantName}>{p.name}</Text>
-              <Text style={styles.participantEmail}>
-                {p.email || "Sem email"}
-              </Text>
-            </View>
-            {p.sent_at ? (
-              <View style={styles.sentBadge}>
-                <Text style={styles.sentText}>Enviado ✓</Text>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.sendBtn,
-                  !p.email && styles.sendBtnDisabled,
-                ]}
-                disabled={!p.email || sendingId === p.id}
-                onPress={() => handleSendEmail(p)}
-              >
-                <Text style={styles.sendBtnText}>
-                  {sendingId === p.id ? "Enviando..." : "Enviar"}
+          {participants.map((p) => (
+            <View key={p.id} style={styles.participantRow}>
+              <View style={styles.participantInfo}>
+                <Text style={styles.participantName}>{p.name}</Text>
+                <Text style={styles.participantEmail}>
+                  {p.email || "Sem email"}
                 </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ))}
-
-        {participants.some((p) => !p.sent_at && p.email) && (
-          <TouchableOpacity style={styles.sendAllBtn} onPress={handleSendAll}>
-            <Text style={styles.sendAllText}>Enviar para Todos</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+              </View>
+              {p.email && (
+                <TouchableOpacity
+                  style={styles.sendBtn}
+                  onPress={() => handleEmailParticipant(p)}
+                >
+                  <Text style={styles.sendBtnText}>Email</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -327,20 +297,19 @@ const styles = StyleSheet.create({
   },
   // Actions
   actions: {
+    gap: spacing.sm,
     marginBottom: spacing.lg,
   },
-  shareBtn: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
+  primaryBtn: {
+    backgroundColor: colors.orange,
     borderRadius: 12,
     padding: spacing.md,
     alignItems: "center",
   },
-  shareBtnText: {
+  primaryBtnText: {
     fontSize: fontSize.md,
-    color: colors.light,
-    fontWeight: "600",
+    color: colors.white,
+    fontWeight: "700",
   },
   // Send section
   sendSection: {
@@ -377,42 +346,17 @@ const styles = StyleSheet.create({
     color: colors.gray,
     marginTop: 2,
   },
-  sentBadge: {
-    backgroundColor: colors.green + "20",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
-  },
-  sentText: {
-    fontSize: fontSize.xs,
-    color: colors.green,
-    fontWeight: "600",
-  },
   sendBtn: {
-    backgroundColor: colors.orange,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.orange,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 8,
   },
-  sendBtnDisabled: {
-    backgroundColor: colors.gray,
-    opacity: 0.5,
-  },
   sendBtnText: {
     fontSize: fontSize.sm,
-    color: colors.white,
+    color: colors.orange,
     fontWeight: "600",
-  },
-  sendAllBtn: {
-    backgroundColor: colors.orange,
-    borderRadius: 12,
-    padding: spacing.md,
-    alignItems: "center",
-    marginTop: spacing.md,
-  },
-  sendAllText: {
-    fontSize: fontSize.md,
-    color: colors.white,
-    fontWeight: "700",
   },
 });
