@@ -1,16 +1,16 @@
 export const colors = {
   orange: "#F97316",
   orangeLight: "#FB923C",
-  dark: "#1E293B",
-  darkLighter: "#334155",
+  dark: "#F8FAFC",
+  darkLighter: "#F1F5F9",
   gray: "#64748B",
-  grayLight: "#94A3B8",
-  light: "#F8FAFC",
+  grayLight: "#475569",
+  light: "#1E293B",
   white: "#FFFFFF",
   red: "#EF4444",
   green: "#22C55E",
-  card: "rgba(255,255,255,0.05)",
-  cardBorder: "rgba(255,255,255,0.1)",
+  card: "#FFFFFF",
+  cardBorder: "#E2E8F0",
 } as const;
 
 export const spacing = {

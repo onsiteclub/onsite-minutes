@@ -71,7 +71,7 @@ export default function DebugScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.dark,
   },
   header: {
     flexDirection: "row",
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   clearText: {
-    color: colors.dark,
+    color: colors.white,
     fontWeight: "700",
     fontSize: fontSize.sm,
   },
