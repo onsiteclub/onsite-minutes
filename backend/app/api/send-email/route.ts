@@ -26,8 +26,10 @@ export async function POST(request: NextRequest) {
         ]
       : [];
 
+    const fromAddress = process.env.EMAIL_FROM || "OnSite Minutes <onboarding@resend.dev>";
+
     const { data, error } = await resend.emails.send({
-      from: "OnSite Minutes <atas@onsite-minutes.app>",
+      from: fromAddress,
       to: [to],
       subject: `Ata de Reunião: ${meetingTitle || "Reunião"}`,
       html: `

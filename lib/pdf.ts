@@ -1,4 +1,5 @@
 import * as Print from "expo-print";
+import * as FileSystem from "expo-file-system";
 import { File, Paths } from "expo-file-system";
 import type { MinutesData } from "./types";
 
@@ -18,14 +19,9 @@ export async function generatePdf(
 }
 
 export async function getPdfBase64(pdfPath: string): Promise<string> {
-  const file = new File(pdfPath);
-  const bytes = await file.bytes();
-  // Convert Uint8Array to base64
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  return await FileSystem.readAsStringAsync(pdfPath, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 }
 
 function buildHtml(m: MinutesData): string {

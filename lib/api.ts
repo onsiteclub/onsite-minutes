@@ -67,6 +67,7 @@ export async function sendEmail(
   });
 
   if (!response.ok) {
-    throw new Error(`Erro ao enviar email: ${response.status}`);
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`Erro ao enviar email: ${response.status} ${errorText}`);
   }
 }
